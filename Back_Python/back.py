@@ -2,11 +2,11 @@ from joblib import dump, load
 import pandas as pd
 import numpy as np
 
-model_knn_go0 = load('src/models/model_knn_0_mono.joblib')
-le_go0 = load('src/models/label_encoder_go0.joblib')
+model_knn_go0 = load('models/model_knn_0_mono.joblib')
+le_go0 = load('models/label_encoder_go0.joblib')
 
-model_knn_go1 = load('src/models/model_knn_1_mono.joblib')
-le_go1 = load('src/models/label_encoder_go1.joblib')
+model_knn_go1 = load('models/model_knn_1_mono.joblib')
+le_go1 = load('models/label_encoder_go1.joblib')
 
 namespaces = {
     'GO:0003674': 'molecular_function',
