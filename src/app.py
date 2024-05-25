@@ -1,6 +1,7 @@
-from flask import Flask, request, jsonify, send_file, send_from_directory
+from flask import Flask, request, jsonify, send_file, send_from_directory, render_template
 from flask_cors import CORS
 from back import *
+import os
 
 app = Flask(__name__, static_folder='react_build')
 cors = CORS(app)
@@ -28,6 +29,15 @@ def receive_question():
         return jsonify(results)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+    
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+# Serve other static files
+@app.route('/static/<path:path>')
+def serve_static(path):
+    return send_from_directory('static', path)
 
 if __name__ == '__main__':
     app.run(port=3001, debug=True) 

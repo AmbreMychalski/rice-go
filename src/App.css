@@ -1,5 +1,12 @@
+body {
+  margin: 0; /* Remove default margin */
+  padding: 0; /* Remove default padding */
+  background-color: #282c34; /* Set the background color of the entire body to black */
+}
+
 .App {
   text-align: center;
+  background-color: #282c34;
 }
 
 .App-header {
