@@ -1,6 +1,7 @@
 from joblib import dump, load
 import pandas as pd
 import numpy as np
+from tensorflow.keras.models import load_model
 
 model_knn_go0 = load('models/model_knn_0_mono.joblib')
 le_go0 = load('models/label_encoder_go0.joblib')
@@ -13,6 +14,11 @@ namespaces = {
     'GO:0008150': 'biological_process',
     'GO:0005575': 'cellular_component'
 }
+
+max_seq_length = 1695
+model_lstm_go0 =  load_model('models/model_lstm_0.h5')
+le_lstm_go0 = load('models/label_encoder_lstm_0.joblib')
+scaler = load("models/scaler.save")
 
 def separate_into_codons(dna_seq):
     codons = [(dna_seq[i:i+3]) for i in range(0, len(dna_seq), 3)]
@@ -210,16 +216,74 @@ def compute_features(dna_sequence):
     }
     return features
 
+# Function to encode DNA sequences into indices
+def encode_dna(sequence, max_length):
+    chars = 'ACGT'
+    char_to_int = dict((c, i) for i, c in enumerate(chars))
+    integer_encoded = [char_to_int[char] for char in sequence if char in char_to_int]
+    while len(integer_encoded) < max_length:
+        integer_encoded.append(0)
+    return integer_encoded[:max_length]
+
+# Function to encode protein sequences into indices
+def encode_protein(sequence, max_length):
+    chars = 'ACDEFGHIKLMNPQRSTVWY'  # 20 acides aminés standards
+    char_to_int = dict((c, i) for i, c in enumerate(chars))
+    integer_encoded = [char_to_int[char] for char in sequence if char in char_to_int]
+    while len(integer_encoded) < max_length:
+        integer_encoded.append(0)
+    return integer_encoded[:max_length]
+
+def preProcessing(DNA_seq):
+    feature = compute_features(DNA_seq)
+    df = pd.DataFrame([feature])
+    
+    sequence_columns = ['DNA_sequence', 'Protein_sequence']
+    encoded_sequences = []
+    for col in sequence_columns:
+        if 'DNA' in col:
+            encoded_col = df[col].apply(lambda x: encode_dna(x, max_seq_length))
+        else:
+            encoded_col = df[col].apply(lambda x: encode_protein(x, max_seq_length))
+        encoded_sequences.append(np.array(encoded_col.tolist()))
+
+    X_sequences = np.concatenate(encoded_sequences, axis=1)
+    X = df.drop(columns=['DNA_sequence', 'Protein_sequence'])
+
+    numeric_columns = X.select_dtypes(include=[np.number]).columns
+
+    X[numeric_columns] = scaler.transform(X[numeric_columns])
+    X_numeric = X.values
+    X_combined = np.concatenate((X_numeric, X_sequences), axis=1)
+    X_reshaped = np.reshape(X_combined, (X_combined.shape[0], 1, X_combined.shape[1]))
+    return X_reshaped
+
 def predict(dna_sequence):
     feature = compute_features(dna_sequence)
     df = pd.DataFrame([feature])
+    x_pred_process = preProcessing(dna_sequence)
+    prediction_go0 = model_lstm_go0.predict(x_pred_process)
+    predicted_class_go0 = np.argmax(prediction_go0, axis=1)
 
-    predicted_class_go0 = model_knn_go0.predict(df)
-    predicted_class_indices_go0 = np.argmax(predicted_class_go0, axis=1)
-    predicted_class_labels_go0 = le_go0.inverse_transform(predicted_class_indices_go0)[0]
+    predicted_class_labels_go0 = le_lstm_go0.inverse_transform(predicted_class_go0)[0]
 
     predicted_class_go1 = model_knn_go1.predict(df)
     predicted_class_indices_go1 = np.argmax(predicted_class_go1, axis=1)
     predicted_class_labels_go1 = le_go1.inverse_transform(predicted_class_indices_go1)[0]
     namespace = namespaces[predicted_class_labels_go0]
     return(predicted_class_labels_go0, predicted_class_labels_go1, namespace, feature['Protein_sequence'])
+
+
+# def predict(dna_sequence):
+#     feature = compute_features(dna_sequence)
+#     df = pd.DataFrame([feature])
+
+#     predicted_class_go0 = model_knn_go0.predict(df)
+#     predicted_class_indices_go0 = np.argmax(predicted_class_go0, axis=1)
+#     predicted_class_labels_go0 = le_go0.inverse_transform(predicted_class_indices_go0)[0]
+
+#     predicted_class_go1 = model_knn_go1.predict(df)
+#     predicted_class_indices_go1 = np.argmax(predicted_class_go1, axis=1)
+#     predicted_class_labels_go1 = le_go1.inverse_transform(predicted_class_indices_go1)[0]
+#     namespace = namespaces[predicted_class_labels_go0]
+#     return(predicted_class_labels_go0, predicted_class_labels_go1, namespace, feature['Protein_sequence'])
